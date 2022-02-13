@@ -20,16 +20,17 @@ namespace SoundSwitch.Framework
 {
     public static class ApplicationPath
     {
+        
         /// <summary>
-        /// Application data directory
+        /// Where the application is installed
         /// </summary>
-        public static string AppData { get; } = Environment.GetFolderPath(
-            Environment.SpecialFolder.ApplicationData);
+        public static string AppData { get; } =
+            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase);
 
         /// <summary>
         /// Path where the application store it's file like the configuration.
         /// </summary>
-        public static string Default { get; } = Path.Combine(AppData, Application.ProductName);
+        public static string Default { get; } = Path.Combine(AppData, "data");
 
         /// <summary>
         /// Path wher ethe application store the logs
