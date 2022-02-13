@@ -22,8 +22,7 @@ env:
   SENTRY_NAME: "soundswitch"
 
 jobs:
-  nightly-release:
-    if: github.ref == 'refs/heads/dev' && needs.changes.outputs.ci == 'true'
+  build:
     outputs:
       devVersion: ${{ steps.devVersion.outputs.version }}
     runs-on: windows-latest
