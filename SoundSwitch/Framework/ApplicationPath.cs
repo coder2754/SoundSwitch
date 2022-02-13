@@ -25,7 +25,7 @@ namespace SoundSwitch.Framework
         /// Where the application is installed
         /// </summary>
         public static string AppData { get; } =
-            Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase);
+            Directory.GetCurrentDirectory();
 
         /// <summary>
         /// Path where the application store it's file like the configuration.
