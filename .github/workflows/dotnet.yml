@@ -51,27 +51,16 @@ jobs:
       - name: Build pre-release
         run: dotnet publish -c ${{env.CONFIGURATION}} --no-restore -r ${{ env.ARCH }} ${{ env.PROJECT_NAME }}\${{ env.PROJECT_NAME }}.csproj
       - name: print
-        run: find ${{ env.PROJECT_NAME }}\bin\ -print
+        run:  ls -LR ./SoundSwitch/bin/ 
       - name: Set Env var from GitHub
         uses: rlespinasse/github-slug-action@v3.x
       - name: Zip Build ${{env.PROJECT_NAME}}-${{ steps.devVersion.outputs.version }}
         run: tar caf   ${{env.PROJECT_NAME}}-${{ steps.devVersion.outputs.version }}.zip -C ${{ env.PROJECT_NAME }}\bin\${{env.CONFIGURATION}}\${{ env.FRAMEWORK }}\${{ env.ARCH }}\publish\ *
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
+      - name:  Upload a Build Artifact
+        uses: actions/upload-artifact@v2.3.1
         with:
-          node-version: ${{env.NODEJS}}
-      - name: Cache node modules
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-node-modules
-        with:
-          path: npm-cache
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
-      - name: Install dependencies
-        run: npm ci --prefer-offline --silent --cache npm-cache
-      - name: Upload prerelease & Notify
-        env:
-          UPLOAD_SECRET: ${{secrets.UPLOAD_SECRET}}
-          UPLOAD_PUBLIC: ${{secrets.UPLOAD_PUBLIC}}
-          UPLOAD_BUCKET: ${{env.PROJECT_NAME}}
-        run: node devRelease.js "${{ secrets.DISCORD_WEBHOOK }}" "${{ steps.devVersion.outputs.version }}" "${{env.GITHUB_REPOSITORY_OWNER_PART}}/${{env.GITHUB_REPOSITORY_NAME_PART}}" "${{env.PROJECT_NAME}}-${{ steps.devVersion.outputs.version }}.zip"
+          # Artifact name
+          name: "a.zip"
+         # A file, directory or wildcard pattern that describes what to upload
+          path: "${{env.PROJECT_NAME}}-${{ steps.devVersion.outputs.version }}.zip"
+
