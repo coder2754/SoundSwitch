@@ -22,88 +22,7 @@ env:
   SENTRY_NAME: "soundswitch"
 
 jobs:
-  build:
-    if: github.ref != 'refs/heads/dev'
-    runs-on: windows-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          all_but_latest: true
-          access_token: ${{ github.token }}
-      - name: Checkout
-        uses: actions/checkout@v2
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            ci:
-             - '.github/**/*.yml'
-             - 'devRelease.js'
-            SoundSwitch:
-              - 'SoundSwitch*/**'
-            node:
-              - 'package.json'
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v1
-        if: steps.filter.outputs.SoundSwitch == 'true' || steps.filter.outputs.ci == 'true' || github.ref == 'refs/heads/master'
-        with:
-          dotnet-version: ${{ env.DOTNET }}
-          include-prerelease: ${{ env.DOTNET_PRERELEASE }}
-      - name: Restore
-        if: steps.filter.outputs.SoundSwitch == 'true' || steps.filter.outputs.ci == 'true' || github.ref == 'refs/heads/master'
-        run: dotnet restore
-      - name: Build
-        if: steps.filter.outputs.SoundSwitch == 'true' || steps.filter.outputs.ci == 'true' || github.ref == 'refs/heads/master'
-        run: dotnet build -c Release --no-restore ${{env.PROJECT_NAME}}/${{env.PROJECT_NAME}}.csproj
-      - name: Test
-        if: steps.filter.outputs.SoundSwitch == 'true' || steps.filter.outputs.ci == 'true' || github.ref == 'refs/heads/master'
-        run: dotnet test -c Release --no-restore  --logger trx --results-directory "TestResults-${{ matrix.dotnet-version }}"
-      - name: Upload test results
-        if: steps.filter.outputs.SoundSwitch == 'true' || steps.filter.outputs.ci == 'true' || github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v2
-        with:
-          name: dotnet-results-${{ matrix.dotnet-version }}
-          path: TestResults-${{ matrix.dotnet-version }}
-        # Use always() to always run this step to publish test results when there are test failures
-      - name: Setup Node.js
-        if: steps.filter.outputs.node == 'true'
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{env.NODEJS}}
-      - name: Cache node modules
-        if: steps.filter.outputs.node == 'true'
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-node-modules
-        with:
-          path: npm-cache
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
-      - name: Install semantic-release dependencies
-        if: steps.filter.outputs.node == 'true'
-        run: npm ci --prefer-offline --silent --cache npm-cache
-      - name: Release dry run
-        if: steps.filter.outputs.node == 'true'
-        run: npx semantic-release -d
-
-  changes:
-    runs-on: ubuntu-latest
-    # Set job outputs to values from filter step
-    outputs:
-      ci: ${{ steps.filter.outputs.ci }}
-    steps:
-      - uses: actions/checkout@v2
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            ci:
-              - '.github/**/*.yml'
-              - 'SoundSwitch*/**'
-              - 'devRelease.js'
-
   nightly-release:
-    needs: [ changes ]
     if: github.ref == 'refs/heads/dev' && needs.changes.outputs.ci == 'true'
     outputs:
       devVersion: ${{ steps.devVersion.outputs.version }}
@@ -132,6 +51,8 @@ jobs:
         run: .\devVersion.ps1
       - name: Build pre-release
         run: dotnet publish -c ${{env.CONFIGURATION}} --no-restore -r ${{ env.ARCH }} ${{ env.PROJECT_NAME }}\${{ env.PROJECT_NAME }}.csproj
+      - name: print
+        run: find ${{ env.PROJECT_NAME }}\bin\ -print
       - name: Set Env var from GitHub
         uses: rlespinasse/github-slug-action@v3.x
       - name: Zip Build ${{env.PROJECT_NAME}}-${{ steps.devVersion.outputs.version }}
@@ -155,63 +76,3 @@ jobs:
           UPLOAD_PUBLIC: ${{secrets.UPLOAD_PUBLIC}}
           UPLOAD_BUCKET: ${{env.PROJECT_NAME}}
         run: node devRelease.js "${{ secrets.DISCORD_WEBHOOK }}" "${{ steps.devVersion.outputs.version }}" "${{env.GITHUB_REPOSITORY_OWNER_PART}}/${{env.GITHUB_REPOSITORY_NAME_PART}}" "${{env.PROJECT_NAME}}-${{ steps.devVersion.outputs.version }}.zip"
-
-  nightly-sentry:
-    needs: nightly-release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Sentry Release
-        uses: getsentry/action-release@v1.1.6
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{env.SENTRY_NAME}}
-          SENTRY_PROJECT: ${{env.SENTRY_NAME}}
-        with:
-          environment: Nightly
-          version: "${{env.PROJECT_NAME}}@${{ needs.nightly-release.outputs.devVersion }}"
-
-  master-release:
-    needs: [ build, changes ]
-    if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          all_but_latest: true
-          access_token: ${{ github.token }}
-      - uses: actions/checkout@v2
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{env.NODEJS}}
-      - name: Cache node modules
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-node-modules
-        with:
-          path: npm-cache
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
-      - name: Install semantic-release dependencies
-        run: npm ci --prefer-offline --silent --cache npm-cache
-      - name: Release
-        run: npx semantic-release
-      - name: Latest Version
-        run: | 
-          version=$(git describe --tags --abbrev=0 | cut -c 2-)
-          echo "::set-output name=version::$version.0"
-        id: version
-      - name: Sentry Release
-        uses: getsentry/action-release@v1.1.6
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{env.SENTRY_NAME}}
-          SENTRY_PROJECT: ${{env.SENTRY_NAME}}
-        with:
-          environment: Stable
-          version: "${{env.PROJECT_NAME}}@${{ steps.version.outputs.version }}"
-
