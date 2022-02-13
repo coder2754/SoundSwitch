@@ -50,8 +50,7 @@ jobs:
         run: .\devVersion.ps1
       - name: Build pre-release
         run: dotnet publish -c ${{env.CONFIGURATION}} --no-restore -r ${{ env.ARCH }} ${{ env.PROJECT_NAME }}\${{ env.PROJECT_NAME }}.csproj
-      - name: print
-        run:  ls -LR ./SoundSwitch/bin/ 
+
       - name: Set Env var from GitHub
         uses: rlespinasse/github-slug-action@v3.x
       - name: Zip Build ${{env.PROJECT_NAME}}-${{ steps.devVersion.outputs.version }}
